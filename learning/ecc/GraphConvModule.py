@@ -15,8 +15,12 @@ from .GraphConvInfo import GraphConvInfo
 from . import cuda_kernels
 from . import utils
 
+
 class GraphConvFunction(Function):
-    """ Computes operations for each edge and averages the results over respective nodes. The operation is either matrix-vector multiplication (for 3D weight tensors) or element-wise vector-vector multiplication (for 2D weight tensors). The evaluation is computed in blocks of size `edge_mem_limit` to reduce peak memory load. See `GraphConvInfo` for info on `idxn, idxe, degs`.
+    """ Computes operations for each edge and averages the results over respective nodes.
+    The operation is either matrix-vector multiplication (for 3D weight tensors) or element-wise vector-vector
+    multiplication (for 2D weight tensors). The evaluation is computed in blocks of size `edge_mem_limit` to reduce
+    peak memory load. See `GraphConvInfo` for info on `idxn, idxe, degs`.
     """
 
     def __init__(self, in_channels, out_channels, idxn, idxe, degs, degs_gpu, edge_mem_limit=1e20):
@@ -37,18 +41,18 @@ class GraphConvFunction(Function):
         else:
             # weights represent diagonal matrices -> mul
             torch.mul(a, b.expand_as(a), out=out)
-       
+
     def forward(self, input, weights):
         self.save_for_backward(input, weights)
 
         self._full_weight_mat = weights.dim()==3
         assert self._full_weight_mat or (self._in_channels==self._out_channels and weights.size(1) == self._in_channels)
 
-        output = input.new(self._degs.numel(), self._out_channels)       
+        output = input.new(self._degs.numel(), self._out_channels)
         
         # loop over blocks of output nodes
         startd, starte = 0, 0
-        for numd, nume in self._shards:            
+        for numd, nume in self._shards:
 
             # select sequence of matching pairs of node and edge weights            
             sel_input = torch.index_select(input, 0, self._idxn.narrow(0,starte,nume))
@@ -155,7 +159,7 @@ class GraphConvModule(nn.Module):
         
     def set_info(self, gc_info):
         self._gci = gc_info
-    
+
     def forward(self, input):       
         # get graph structure information tensors
         idxn, idxe, degs, degs_gpu, edgefeats = self._gci.get_buffers()
@@ -169,15 +173,13 @@ class GraphConvModule(nn.Module):
             weights = weights.view(-1, self._in_channels, self._out_channels)
 
         return GraphConvFunction(self._in_channels, self._out_channels, idxn, idxe, degs, degs_gpu, self._edge_mem_limit)(input, weights)
-        
-
-
-
 
 
 class GraphConvModulePureAutograd(nn.Module):
     """
-    Autograd-only equivalent of `GraphConvModule` + `GraphConvFunction`. Unfortunately, autograd needs to store intermediate products, which makes the module work only for very small graphs. The module is kept for didactic purposes only.
+    Autograd-only equivalent of `GraphConvModule` + `GraphConvFunction`.
+    Autograd needs to store intermediate products, which makes the module work only for very small graphs.
+    The module is kept for didactic purposes only.
     """
 
     def __init__(self, in_channels, out_channels, filter_net, gc_info=None):

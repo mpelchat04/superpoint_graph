@@ -29,7 +29,7 @@ class GraphPoolFunction(Function):
         self._degs_gpu = degs_gpu
         self._aggr = aggr
         self._shards = utils.get_edge_shards(degs, edge_mem_limit)
-                
+
     def forward(self, input):
         output = input.new(self._degs.numel(), input.size(1))
         if self._aggr==GraphPoolFunction.AGGR_MAX:
@@ -124,8 +124,8 @@ class GraphPoolModule(nn.Module):
         
     def set_info(self, gp_info):
         self._gpi = gp_info
-        
-    def forward(self, input):       
+
+    def forward(self, input):
         idxn, degs, degs_gpu = self._gpi.get_buffers()
         return GraphPoolFunction(idxn, degs, degs_gpu, self._aggr, self._edge_mem_limit)(input)
         
