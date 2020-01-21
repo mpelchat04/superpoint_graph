@@ -71,7 +71,7 @@ for folder in folders:
     if not os.path.isdir(spg_folder):
         os.mkdir(spg_folder)
     
-    if args.dataset=='s3dis':    
+    if args.dataset=='s3dis':
         files = [os.path.join(data_folder, o) for o in os.listdir(data_folder) 
                 if os.path.isdir(os.path.join(data_folder,o))]
     elif args.dataset=='sema3d':

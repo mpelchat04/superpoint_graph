@@ -9,6 +9,7 @@ from __future__ import print_function
 from builtins import range
 
 import torch
+
 try:
     import cupy.cuda
     from pynvrtc.compiler import Program
@@ -19,39 +20,42 @@ import numpy as np
 
 CUDA_NUM_THREADS = 1024
 
+
 def GET_BLOCKS(N):
-  return (N + CUDA_NUM_THREADS - 1) // CUDA_NUM_THREADS;
-  
+    return (N + CUDA_NUM_THREADS - 1) // CUDA_NUM_THREADS;
+
+
 modules = {}
+
 
 def get_dtype(t):
     if isinstance(t, torch.cuda.FloatTensor):
         return 'float'
     elif isinstance(t, torch.cuda.DoubleTensor):
         return 'double'
-   
+
+
 def get_kernel_func(kname, ksrc, dtype):
-    if kname+dtype not in modules:
+    if kname + dtype not in modules:
         ksrc = ksrc.replace('DTYPE', dtype)
-        #prog = Program(ksrc.encode('utf-8'), (kname+dtype+'.cu').encode('utf-8'))
-        #uncomment the line above and comment the line below if it causes the following error: AttributeError: 'Program' object has no attribute '_program'
-        prog = Program(ksrc, kname+dtype+'.cu')        
+        # prog = Program(ksrc.encode('utf-8'), (kname+dtype+'.cu').encode('utf-8'))
+        # uncomment the line above and comment the line below if it causes the following error: AttributeError: 'Program' object has no attribute '_program'
+        prog = Program(ksrc, kname + dtype + '.cu')
         ptx = prog.compile()
         log = prog._interface.nvrtcGetProgramLog(prog._program)
         if len(log.strip()) > 0: print(log)
         module = cupy.cuda.function.Module()
         module.load(bytes(ptx.encode()))
-        modules[kname+dtype] = module
+        modules[kname + dtype] = module
     else:
-        module = modules[kname+dtype]
-        
+        module = modules[kname + dtype]
+
     Stream = namedtuple('Stream', ['ptr'])
-    s = Stream(ptr=torch.cuda.current_stream().cuda_stream)        
-        
+    s = Stream(ptr=torch.cuda.current_stream().cuda_stream)
+
     return module.get_function(kname), s
-        
-####       
-       
+
+
 def conv_aggregate_fw_kernel_v2(**kwargs):
     kernel = r'''
 extern "C"
@@ -83,8 +87,9 @@ __global__ void conv_aggregate_fw_kernel_v2(DTYPE* dest, const DTYPE* src, const
 	}
 }
 '''
-    return kernel   
-    
+    return kernel
+
+
 def conv_aggregate_bw_kernel_v2(**kwargs):
     kernel = r'''
 extern "C"
@@ -111,33 +116,35 @@ __global__ void conv_aggregate_bw_kernel_v2(DTYPE* dest, const DTYPE* src, const
 	}
 }
 '''
-    return kernel   
-    
+    return kernel
 
-def conv_aggregate_fw(dest, src, degs):   
+
+def conv_aggregate_fw(dest, src, degs):
     n = degs.numel()
     w = src.size(1)
     assert n == dest.size(0) and w == dest.size(1)
-    assert type(src)==type(dest) and isinstance(degs, torch.cuda.LongTensor)
-    
-    csdegs = torch.cumsum(degs,0)
-    blockDimY = n // (1024/(w//32+1)) +1 # try to occuppy 1024 threads by splitting also over nodes
+    assert type(src) == type(dest) and isinstance(degs, torch.cuda.LongTensor)
+
+    csdegs = torch.cumsum(degs, 0)
+    blockDimY = n // (1024 / (w // 32 + 1)) + 1  # try to occuppy 1024 threads by splitting also over nodes
     function, stream = get_kernel_func('conv_aggregate_fw_kernel_v2', conv_aggregate_fw_kernel_v2(), get_dtype(src))
-    function(args=[dest.data_ptr(), src.data_ptr(), degs.data_ptr(), csdegs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)), np.int32(src.stride(0)), np.int32(blockDimY)], 
-             block=(CUDA_NUM_THREADS,1,1), grid=(GET_BLOCKS(w),n//blockDimY+1,1), stream=stream)            
-                                         
+    function(args=[dest.data_ptr(), src.data_ptr(), degs.data_ptr(), csdegs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)),
+                   np.int32(src.stride(0)), np.int32(blockDimY)],
+             block=(CUDA_NUM_THREADS, 1, 1), grid=(GET_BLOCKS(w), n // blockDimY + 1, 1), stream=stream)
+
+
 def conv_aggregate_bw(dest, src, degs):
     n = degs.numel()
     w = src.size(1)
     assert n == src.size(0) and w == dest.size(1)
-    assert type(src)==type(dest) and isinstance(degs, torch.cuda.LongTensor)
-    
-    csdegs = torch.cumsum(degs,0)
-    blockDimY = n // (1024/(w//32+1)) +1 # try to occuppy 1024 threads by splitting also over nodes
+    assert type(src) == type(dest) and isinstance(degs, torch.cuda.LongTensor)
+
+    csdegs = torch.cumsum(degs, 0)
+    blockDimY = n // (1024 / (w // 32 + 1)) + 1  # try to occuppy 1024 threads by splitting also over nodes
     function, stream = get_kernel_func('conv_aggregate_bw_kernel_v2', conv_aggregate_bw_kernel_v2(), get_dtype(src))
-    function(args=[dest.data_ptr(), src.data_ptr(), degs.data_ptr(), csdegs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)), np.int32(src.stride(0)), np.int32(blockDimY)],
-             block=(CUDA_NUM_THREADS,1,1), grid=(GET_BLOCKS(w),n//blockDimY+1,1), stream=stream)
-                                         
+    function(args=[dest.data_ptr(), src.data_ptr(), degs.data_ptr(), csdegs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)),
+                   np.int32(src.stride(0)), np.int32(blockDimY)],
+             block=(CUDA_NUM_THREADS, 1, 1), grid=(GET_BLOCKS(w), n // blockDimY + 1, 1), stream=stream)
 
 
 def maxpool_fw_kernel(**kwargs):
@@ -177,7 +184,8 @@ __global__ void maxpool_fw_kernel(DTYPE* dest, long long* indices, const DTYPE* 
 }
 '''
     return kernel
-    
+
+
 def maxpool_bw_kernel(**kwargs):
     kernel = r'''
 //also directly scatters results by dest_indices (saves one sparse intermediate buffer)
@@ -202,29 +210,32 @@ __global__ void maxpool_bw_kernel(DTYPE* dest, const long long* dest_indices, co
 }
 '''
     return kernel
-    
-    
-def maxpool_fw(dest, indices, src, degs):   
+
+
+def maxpool_fw(dest, indices, src, degs):
     n = degs.numel()
     w = src.size(1)
     assert n == dest.size(0) and w == dest.size(1)
-    assert type(src)==type(dest) and isinstance(degs, torch.cuda.LongTensor) and isinstance(indices, torch.cuda.LongTensor)
-    
+    assert type(src) == type(dest) and isinstance(degs, torch.cuda.LongTensor) and isinstance(indices, torch.cuda.LongTensor)
+
     function, stream = get_kernel_func('maxpool_fw_kernel', maxpool_fw_kernel(), get_dtype(src))
-    function(args=[dest.data_ptr(), indices.data_ptr(), src.data_ptr(), degs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)), np.int32(src.stride(0))],
-             block=(CUDA_NUM_THREADS,1,1), grid=(GET_BLOCKS(w),1,1), stream=stream)    
-    
-def maxpool_bw(dest, idxn, indices, src, degs):   
+    function(args=[dest.data_ptr(), indices.data_ptr(), src.data_ptr(), degs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)),
+                   np.int32(src.stride(0))],
+             block=(CUDA_NUM_THREADS, 1, 1), grid=(GET_BLOCKS(w), 1, 1), stream=stream)
+
+
+def maxpool_bw(dest, idxn, indices, src, degs):
     n = degs.numel()
     w = src.size(1)
     assert n == src.size(0) and w == dest.size(1)
-    assert type(src)==type(dest) and isinstance(degs, torch.cuda.LongTensor) and isinstance(indices, torch.cuda.LongTensor) and isinstance(idxn, torch.cuda.LongTensor)
-    
-    function, stream = get_kernel_func('maxpool_bw_kernel', maxpool_bw_kernel(), get_dtype(src))
-    function(args=[dest.data_ptr(), idxn.data_ptr(), indices.data_ptr(), src.data_ptr(), degs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)), np.int32(src.stride(0))],
-             block=(CUDA_NUM_THREADS,1,1), grid=(GET_BLOCKS(w),1,1), stream=stream)    
+    assert type(src) == type(dest) and isinstance(degs, torch.cuda.LongTensor) and isinstance(indices, torch.cuda.LongTensor) and isinstance(idxn,
+                                                                                                                                             torch.cuda.LongTensor)
 
-    
+    function, stream = get_kernel_func('maxpool_bw_kernel', maxpool_bw_kernel(), get_dtype(src))
+    function(args=[dest.data_ptr(), idxn.data_ptr(), indices.data_ptr(), src.data_ptr(), degs.data_ptr(), np.int32(w), np.int32(n),
+                   np.int32(dest.stride(0)), np.int32(src.stride(0))],
+             block=(CUDA_NUM_THREADS, 1, 1), grid=(GET_BLOCKS(w), 1, 1), stream=stream)
+
 
 def avgpool_bw_kernel(**kwargs):
     kernel = r'''
@@ -255,15 +266,17 @@ __global__ void avgpool_bw_kernel(DTYPE* dest, const long long* dest_indices, co
     return kernel
 
 
-def avgpool_fw(dest, src, degs):   
+def avgpool_fw(dest, src, degs):
     conv_aggregate_fw(dest, src, degs)
 
-def avgpool_bw(dest, idxn, src, degs):   
+
+def avgpool_bw(dest, idxn, src, degs):
     n = degs.numel()
     w = src.size(1)
     assert n == src.size(0) and w == dest.size(1)
-    assert type(src)==type(dest) and isinstance(degs, torch.cuda.LongTensor) and isinstance(idxn, torch.cuda.LongTensor)
-    
+    assert type(src) == type(dest) and isinstance(degs, torch.cuda.LongTensor) and isinstance(idxn, torch.cuda.LongTensor)
+
     function, stream = get_kernel_func('avgpool_bw_kernel', avgpool_bw_kernel(), get_dtype(src))
-    function(args=[dest.data_ptr(), idxn.data_ptr(), src.data_ptr(), degs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)), np.int32(src.stride(0))],
-             block=(CUDA_NUM_THREADS,1,1), grid=(GET_BLOCKS(w),1,1), stream=stream)      
+    function(args=[dest.data_ptr(), idxn.data_ptr(), src.data_ptr(), degs.data_ptr(), np.int32(w), np.int32(n), np.int32(dest.stride(0)),
+                   np.int32(src.stride(0))],
+             block=(CUDA_NUM_THREADS, 1, 1), grid=(GET_BLOCKS(w), 1, 1), stream=stream)

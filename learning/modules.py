@@ -195,10 +195,10 @@ class ECC_CRFModule(nn.Module):
     def forward(self, input):
         Q = nnf.softmax(input)
         for i in range(self._nrepeats):
-            Q = self._propagation(Q) # todo: speedup possible by sharing computation of fnet
+            Q = self._propagation(Q)  # todo: speedup possible by sharing computation of fnet
             Q = input - Q
             if i < self._nrepeats-1:
-                Q = nnf.softmax(Q) # last softmax will be part of cross-entropy loss
+                Q = nnf.softmax(Q)  # last softmax will be part of cross-entropy loss
         return Q
 
 

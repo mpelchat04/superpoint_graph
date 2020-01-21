@@ -152,17 +152,19 @@ class GraphConvFunction(Function):
         return grad_input, grad_weights, None, None, None, None, None, None, None
 
 
-
 class GraphConvModule(nn.Module):
     """ Computes graph convolution using filter weights obtained from a filter generating network (`filter_net`).
-        The input should be a 2D tensor of size (# nodes, `in_channels`). Multiple graphs can be concatenated in the same tensor (minibatch).
+        The input should be a 2D tensor of size (# nodes, `in_channels`).
+        Multiple graphs can be concatenated in the same tensor (minibatch).
     
     Parameters:
     in_channels: number of input channels
     out_channels: number of output channels
-    filter_net: filter-generating network transforming a 2D tensor (# edges, # edge features) to (# edges, in_channels*out_channels) or (# edges, in_channels)
+    filter_net: filter-generating network transforming a 2D tensor (# edges, # edge features)
+                to (# edges, in_channels*out_channels) or (# edges, in_channels)
     gc_info: GraphConvInfo object containing graph(s) structure information, can be also set with `set_info()` method.
-    edge_mem_limit: block size (number of evaluated edges in parallel) for convolution evaluation, a low value reduces peak memory. 
+    edge_mem_limit: block size (number of evaluated edges in parallel) for convolution evaluation.
+                    A low value reduces peak memory.
     """
 
     def __init__(self, in_channels, out_channels, filter_net, gc_info=None, edge_mem_limit=1e20):
@@ -245,4 +247,3 @@ class GraphConvModulePureAutograd(nn.Module):
             k = k + degs[i]
 
         return output
-    

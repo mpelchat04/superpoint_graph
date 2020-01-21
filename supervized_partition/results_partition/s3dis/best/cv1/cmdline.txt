@@ -1,0 +1,1 @@
+'/wspace/disk01/lidar/superpoint_graph/supervized_partition/supervized_partition.py' --ROOT_PATH '/wspace/disk01/lidar/' --cvfold '1' --odir 'results_partition/s3dis/best' --epochs '50' --reg_strength '0.1' --spatial_emb '0.2' --global_feat 'eXYrgb' --CP_cutoff '25'

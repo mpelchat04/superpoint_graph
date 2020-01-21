@@ -26,11 +26,11 @@ import spg
 
 def get_datasets(args, test_seed_offset=0):
     """build training and testing set"""
-    
-    #for a simple train/test organization
+
+    # for a simple train/test organization
     trainset = ['train/' + f for f in os.listdir(args.CUSTOM_SET_PATH + '/superpoint_graphs/train')]
-    testset  = ['test/' + f for f in os.listdir(args.CUSTOM_SET_PATH + '/superpoint_graphs/train')]
-    
+    testset = ['test/' + f for f in os.listdir(args.CUSTOM_SET_PATH + '/superpoint_graphs/train')]
+
     # Load superpoints graphs
     testlist, trainlist = [], []
     for n in trainset:
@@ -40,13 +40,15 @@ def get_datasets(args, test_seed_offset=0):
 
     # Normalize edge features
     if args.spg_attribs01:
-       trainlist, testlist, validlist, scaler = spg.scaler01(trainlist, testlist)
+        trainlist, testlist, validlist, scaler = spg.scaler01(trainlist, testlist)
 
     return tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in trainlist],
-                                    functools.partial(spg.loader, train=True, args=args, db_path=args.CUSTOM_SET_PATH)), \
+                                   functools.partial(spg.loader, train=True, args=args, db_path=args.CUSTOM_SET_PATH)), \
            tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in testlist],
-                                    functools.partial(spg.loader, train=False, args=args, db_path=args.CUSTOM_SET_PATH, test_seed_offset=test_seed_offset)) ,\
-            scaler
+                                   functools.partial(spg.loader, train=False, args=args, db_path=args.CUSTOM_SET_PATH,
+                                                     test_seed_offset=test_seed_offset)), \
+           scaler
+
 
 def get_info(args):
     edge_feats = 0
@@ -58,11 +60,12 @@ def get_info(args):
             edge_feats += 1
 
     return {
-        'node_feats': 11 if args.pc_attribs=='' else len(args.pc_attribs),
+        'node_feats': 11 if args.pc_attribs == '' else len(args.pc_attribs),
         'edge_feats': edge_feats,
-        'classes': 10, #CHANGE TO YOUR NUMBER OF CLASS
-        'inv_class_map': {0:'class_A', 1:'class_B'}, #etc...
+        'classes': 10,  # CHANGE TO YOUR NUMBER OF CLASS
+        'inv_class_map': {0: 'class_A', 1: 'class_B'},  # etc...
     }
+
 
 def preprocess_pointclouds(SEMA3D_PATH):
     """ Preprocesses data by splitting them by components and normalizing."""
@@ -81,16 +84,16 @@ def preprocess_pointclouds(SEMA3D_PATH):
                 f = h5py.File(pathD + file, 'r')
                 xyz = f['xyz'][:]
                 rgb = f['rgb'][:].astype(np.float)
-                elpsv = np.stack([ f['xyz'][:,2][:], f['linearity'][:], f['planarity'][:], f['scattering'][:], f['verticality'][:] ], axis=1)
+                elpsv = np.stack([f['xyz'][:, 2][:], f['linearity'][:], f['planarity'][:], f['scattering'][:], f['verticality'][:]], axis=1)
 
                 # rescale to [-0.5,0.5]; keep xyz
-                #warning - to use the trained model, make sure the elevation is comparable
-                #to the set they were trained on
-                #i.e. ~0 for roads and ~0.2-0.3 for builings for sema3d
+                # warning - to use the trained model, make sure the elevation is comparable
+                # to the set they were trained on
+                # i.e. ~0 for roads and ~0.2-0.3 for builings for sema3d
                 # and -0.5 for floor and 0.5 for ceiling for s3dis
-                elpsv[:,0] /= 100 # (rough guess) #adapt 
-                elpsv[:,1:] -= 0.5
-                rgb = rgb/255.0 - 0.5
+                elpsv[:, 0] /= 100  # (rough guess) #adapt
+                elpsv[:, 1:] -= 0.5
+                rgb = rgb / 255.0 - 0.5
 
                 P = np.concatenate([xyz, rgb, elpsv], axis=1)
 
@@ -100,17 +103,17 @@ def preprocess_pointclouds(SEMA3D_PATH):
                 with h5py.File(pathP + file, 'w') as hf:
                     for c in range(numc):
                         idx = f['components/{:d}'.format(c)][:].flatten()
-                        if idx.size > 10000: # trim extra large segments, just for speed-up of loading time
+                        if idx.size > 10000:  # trim extra large segments, just for speed-up of loading time
                             ii = random.sample(range(idx.size), k=10000)
                             idx = idx[ii]
 
-                        hf.create_dataset(name='{:d}'.format(c), data=P[idx,...])
+                        hf.create_dataset(name='{:d}'.format(c), data=P[idx, ...])
+
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description='Large-scale Point Cloud Semantic Segmentation with Superpoint Graphs')
     parser.add_argument('--CUSTOM_SET_PATH', default='datasets/custom_set')
     args = parser.parse_args()
     preprocess_pointclouds(args.CUSTOM_SET_PATH)
-
-
