@@ -68,7 +68,7 @@ python supervized_partition/evaluate_partition.py --dataset s3dis --folder pretr
 
 Then, reorganize point clouds into superpoints with:
 ```
-python learning/s3dis_dataset.py --S3DIS_PATH $S3DIS_DIR --supervized_partition 1  -plane_model_elevation 1
+python learning/s3dis_dataset.py --S3DIS_PATH $S3DIS_DIR --supervized_partition 1  --plane_model_elevation 1
 ```
 
 Then to learn the SPG models from scratch, run:

@@ -67,8 +67,8 @@ for i_fold in range(len(args.cvfold)):
     c_BP = np.array(res_file["confusion_matrix_BP"])
     c_BR = np.array(res_file["confusion_matrix_BR"])
     n_sp = np.array(res_file["n_clusters"])
-    print(f"Fold {fold} : \t n_sp = {n_sp} \t ASA = {100 * c_classes.trace() / c_classes.sum()}% "
-          f"\t BR = {100 * c_BR[1,1] / (c_BR[1,1] + c_BR[1,0])}% \t BP = {100 * c_BP[1,1] / (c_BP[1,1] + c_BP[0,1])}%")
+    print(f"Fold {fold} : \t n_sp = {n_sp} \t ASA = {100 * c_classes.trace() / c_classes.sum():.2f}% "
+          f"\t BR = {100 * c_BR[1,1] / (c_BR[1,1] + c_BR[1,0]):.2f}% \t BP = {100 * c_BP[1,1] / (c_BP[1,1] + c_BP[0,1]):.2f}%")
     C_classes += c_classes
     C_BR += c_BR
     C_BP += c_BP
@@ -76,10 +76,10 @@ for i_fold in range(len(args.cvfold)):
     N_pc += fold_size[i_fold]
     
 if N_sp > 0:
-    print(f"\nOverall : \t n_sp = {N_sp/N_pc}  \t ASA = {100 * C_classes.trace() / C_classes.sum()}% "
-          f"\t BR = {100 * C_BR[1,1] / (C_BR[1,1] + C_BR[1,0])}% \t BP = {100 * C_BP[1,1] / (C_BP[1,1] + C_BP[0,1])}%\n")
+    print(f"\nOverall : \t n_sp = {N_sp/N_pc:.0f}  \t ASA = {100 * C_classes.trace() / C_classes.sum():.2f}% "
+          f"\t BR = {100 * C_BR[1,1] / (C_BR[1,1] + C_BR[1,0]):.2f}% \t BP = {100 * C_BP[1,1] / (C_BP[1,1] + C_BP[0,1]):.2f}%\n")
 
-    file_result_txt.write(f"{N_sp/N_pc} \t {100 * C_classes.trace() / C_classes.sum()} "
-                          f"\t {100 * C_BR[1,1] / (C_BR[1,1] + C_BR[1,0])}% \t {100 * C_BP[1,1] / (C_BP[1,1] + C_BP[0,1])}%\n")
+    file_result_txt.write(f"{N_sp/N_pc:.0f} \t {100 * C_classes.trace() / C_classes.sum():.2f} "
+                          f"\t {100 * C_BR[1,1] / (C_BR[1,1] + C_BR[1,0]):.2f}% \t {100 * C_BP[1,1] / (C_BP[1,1] + C_BP[0,1]):.2f}%\n")
 
 file_result_txt.close()
