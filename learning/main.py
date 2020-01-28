@@ -37,7 +37,7 @@ from learning import pointnet
 from learning import metrics
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(description='Large-scale Point Cloud Semantic Segmentation with Superpoint Graphs')
 
     # Optimization arguments
@@ -134,7 +134,11 @@ def main():
     args.ptn_widths = ast.literal_eval(args.ptn_widths)
     args.sp_decoder_config = ast.literal_eval(args.sp_decoder_config)
     args.ptn_widths_stn = ast.literal_eval(args.ptn_widths_stn)
+    return args
 
+
+def main():
+    args = parse_args()
     print('Will save to ' + args.odir)
     if not os.path.exists(args.odir):
         os.makedirs(args.odir)
@@ -217,7 +221,7 @@ def main():
 
             embeddings = ptnCloudEmbedder.run(model, *clouds_data)
             outputs = model.ecc(embeddings)
-            
+
             loss = nn.functional.cross_entropy(outputs, Variable(label_mode), weight=dbinfo["class_weights"])
 
             loss.backward()
@@ -229,7 +233,7 @@ def main():
             optimizer.step()
 
             t_trainer = 1000*(time.time()-t0)
-            loss_meter.add(loss.item()) # pytorch 0.4
+            loss_meter.add(loss.item())  # pytorch 0.4
 
             o_cpu, t_cpu, tvec_cpu = filter_valid(outputs.data.cpu().numpy(), label_mode_cpu.numpy(), label_vec_cpu.numpy())
             acc_meter.add(o_cpu, t_cpu)
@@ -238,7 +242,9 @@ def main():
             logging.debug('Batch loss %f, Loader time %f ms, Trainer time %f ms.', loss.data.item(), t_loader, t_trainer)
             t0 = time.time()
 
-        return acc_meter.value()[0], loss_meter.value()[0], confusion_matrix.get_overall_accuracy(), confusion_matrix.get_average_intersection_union()
+        metrics_trn = {'acc': acc_meter.value()[0], 'loss': loss_meter.value()[0], 'oacc': confusion_matrix.get_overall_accuracy(),
+                       'avg_iou': confusion_matrix.get_average_intersection_union()}
+        return metrics_trn
 
     def eval(is_valid=False):
         """ Evaluated model on test set """
@@ -276,8 +282,9 @@ def main():
                 acc_meter.add(o_cpu, t_cpu)
                 confusion_matrix.count_predicted_batch(tvec_cpu, np.argmax(o_cpu, 1))
 
-        return meter_value(acc_meter), loss_meter.value()[0], confusion_matrix.get_overall_accuracy(), \
-               confusion_matrix.get_average_intersection_union(), confusion_matrix.get_mean_class_accuracy()
+        metrics_eval = {'acc': meter_value(acc_meter), 'loss': loss_meter.value()[0], 'oacc': confusion_matrix.get_overall_accuracy(),
+                        'avg_iou': confusion_matrix.get_average_intersection_union(), 'avg_acc': confusion_matrix.get_mean_class_accuracy()}
+        return metrics_eval
 
     def eval_final():
         """ Evaluated model on test set in an extended way: computes estimates over multiple samples of point clouds and stores predictions """
@@ -297,7 +304,7 @@ def main():
             # iterate over dataset in batches
             for bidx, (targets, GIs, clouds_data) in enumerate(loader):
                 model.ecc.set_info(GIs, args.cuda)
-                label_mode_cpu, label_vec_cpu, segm_size_cpu = targets[:, 0], targets[:, :], targets[:, 1:].sum(1).float()
+                label_mode_cpu, label_vec_cpu, segm_size_cpu = targets[:, 0], targets[:, 2:], targets[:, 1:].sum(1).float()
 
                 embeddings = ptnCloudEmbedder.run(model, *clouds_data)
                 outputs = model.ecc(embeddings)
@@ -324,8 +331,10 @@ def main():
         for c, name in dbinfo['inv_class_map'].items():
             per_class_iou[name] = perclsiou[c]
 
-        return meter_value(acc_meter), confusion_matrix.get_overall_accuracy(), confusion_matrix.get_average_intersection_union(), \
-               per_class_iou, predictions,  confusion_matrix.get_mean_class_accuracy(), confusion_matrix.confusion_matrix
+        metrics_final = {'acc': meter_value(acc_meter), 'oacc': confusion_matrix.get_overall_accuracy(),
+                         'avg_iou': confusion_matrix.get_average_intersection_union(), 'per_class_iou': per_class_iou, 'predictions': predictions,
+                         'avg_acc': confusion_matrix.get_mean_class_accuracy(), 'confusion_matrix': confusion_matrix.confusion_matrix}
+        return metrics_final
 
     # Training loop
     try:
@@ -339,21 +348,22 @@ def main():
     epoch = args.start_epoch
     
     for epoch in range(args.start_epoch, args.epochs):
-        print('Epoch {}/{} ({}):'.format(epoch, args.epochs, args.odir))
+        print(f"Epoch {epoch}/{args.epochs} ({args.odir})")
         scheduler.step()
 
-        acc, loss, oacc, avg_iou = train()
+        metrics_trn = train()
 
-        print(TRAIN_COLOR + '-> Train Loss: %1.4f   Train accuracy: %3.2f%%' % (loss, acc))
+        print(TRAIN_COLOR + f"-> Train Loss: {metrics_trn['loss']:.4f}  Train accuracy: {metrics_trn['acc']:.2f}%")
 
         new_best_model = False
         if args.use_val_set:
-            acc_val, loss_val, oacc_val, avg_iou_val, avg_acc_val = eval(True)
-            print(VAL_COLOR + f"-> Val Loss: {loss_val:.4f}  Val accuracy: {acc_val:.2f}%  Val oAcc: {100*oacc_val:.2f}%  "
-                  f"Val IoU: {100*avg_iou_val:.2f}%  best ioU: {100*max(best_iou,avg_iou_val):.2f}%" + TRAIN_COLOR)
-            if avg_iou_val > best_iou:  # best score yet on the validation set
+            metrics_eval = eval(True)
+            print(VAL_COLOR + f"-> Val Loss: {metrics_eval['loss']:.4f}  Val accuracy: {metrics_eval['acc']:.2f}%  "
+                  f"Val oAcc: {100*metrics_eval['oacc']:.2f}%  Val IoU: {100*metrics_eval['avg_iou']:.2f}%  "
+                  f"best ioU: {100*max(best_iou,metrics_eval['avg_iou']):.2f}%" + TRAIN_COLOR)
+            if metrics_eval['avg_iou'] > best_iou:  # best score yet on the validation set
                 print(BEST_COLOR + '-> New best model achieved!' + TRAIN_COLOR)
-                best_iou = avg_iou_val
+                best_iou = metrics_eval['avg_iou']
                 new_best_model = True
                 torch.save({'epoch': epoch + 1, 'args': args, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()},
                            os.path.join(args.odir, 'model.pth.tar'))
@@ -361,34 +371,26 @@ def main():
             torch.save({'epoch': epoch + 1, 'args': args, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()},
                        os.path.join(args.odir, 'model.pth.tar'))
         # test every test_nth_epochs
-        # or test after each enw model (but skip the first 5 for efficiency)
-        if (not args.use_val_set and (epoch+1) % args.test_nth_epoch == 0)  \
-           or (args.use_val_set and new_best_model and epoch > 5): 
-            acc_test, loss_test, oacc_test, avg_iou_test, avg_acc_test = eval(False)
-            print(TEST_COLOR + f"-> Test Loss: {loss_test:.4f}  Test accuracy: {acc_test:.2f}%  "
-                  f"Test oAcc: {100*oacc_test:.2f}%  Test avgIoU: {100*avg_iou_test:.2f}%" + TRAIN_COLOR)
+        # or test after each new model (but skip the first 5 for efficiency)
+        if (not args.use_val_set and (epoch+1) % args.test_nth_epoch == 0) or (args.use_val_set and new_best_model and epoch > 5):
+            metrics_test = eval(False)
+            print(TEST_COLOR + f"-> Test Loss: {metrics_test['loss']:.4f}  Test accuracy: {metrics_test['acc']:.2f}%  "
+                  f"Test oAcc: {100*metrics_test['oacc']:.2f}%  Test avgIoU: {100*metrics_test['avg_iou']:.2f}%" + TRAIN_COLOR)
         else:
-            acc_test, loss_test, oacc_test, avg_iou_test, avg_acc_test = 0, 0, 0, 0, 0
+            metrics_test = {'acc': 0, 'loss': 0, 'oacc': 0, 'avg_iou': 0, 'avg_acc': 0}
 
-        stats.append({'epoch': epoch, 'acc': acc, 'loss': loss, 'oacc': oacc, 'avg_iou': avg_iou, 'acc_test': acc_test, 'oacc_test': oacc_test,
-                      'avg_iou_test': avg_iou_test, 'avg_acc_test': avg_acc_test, 'best_iou': best_iou})
+        stats.append({'epoch': epoch, 'acc_trn': metrics_trn['acc'], 'loss_trn': metrics_trn['loss'], 'oacc_trn': metrics_trn['oacc'],
+                      'avg_iou_trn': metrics_trn['avg_iou'], 'acc_test': metrics_test['acc'], 'oacc_test': metrics_test['oacc_test'],
+                      'avg_iou_test': metrics_test['avg_iou'], 'avg_acc_test': metrics_test['avg_acc'], 'best_iou': best_iou})
 
-        """
-        if epoch % args.save_nth_epoch == 0 or epoch==args.epochs-1:
-            with open(os.path.join(args.odir, 'trainlog.json'), 'w') as outfile:
-                json.dump(stats, outfile,indent=4)
-            torch.save({'epoch': epoch + 1, 'args': args, 'state_dict': model.state_dict(), 'optimizer' : optimizer.state_dict(), 'scaler': scaler},
-                       os.path.join(args.odir, 'model.pth.tar'))
-        """
-        
-        if math.isnan(loss):
+        if math.isnan(metrics_trn['loss']):
             break
     
     if len(stats) > 0:
         with open(os.path.join(args.odir, 'trainlog.json'), 'w') as outfile:
             json.dump(stats, outfile, indent=4)
 
-    if args.use_val_set :
+    if args.use_val_set:
         args.resume = args.odir + '/model.pth.tar'
         model, optimizer, stats = resume(args, dbinfo)
         torch.save({'epoch': epoch + 1, 'args': args, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()},
@@ -396,16 +398,17 @@ def main():
     
     # Final evaluation
     if args.test_multisamp_n > 0 and 'test' in args.db_test_name:
-        acc_test, oacc_test, avg_iou_test, per_class_iou_test, predictions_test, avg_acc_test, confusion_matrix = eval_final()
-        print(f"-> Multisample {args.test_multisamp_n}: Test accuracy: {acc_test}, \tTest oAcc: {oacc_test}, \tTest avgIoU: {avg_iou_test}, "
-              f"\tTest mAcc: {avg_acc_test}'")
+        metrics_test = eval_final()
+        print(f"-> Multisample {args.test_multisamp_n}: Test accuracy: {metrics_test['acc']:.2f}, \tTest oAcc: {metrics_test['oacc']:.2f}, "
+              f"\tTest avgIoU: {metrics_test['avg_iou']:.2f}, \tTest mAcc: {metrics_test['avg_acc']:.2f}'")
         with h5py.File(os.path.join(args.odir, 'predictions_'+args.db_test_name+'.h5'), 'w') as hf:
-            for fname, o_cpu in predictions_test.items():
+            for fname, o_cpu in metrics_test['predictions'].items():
                 hf.create_dataset(name=fname, data=o_cpu)  # (0-based classes)
         with open(os.path.join(args.odir, 'scores_'+args.db_test_name+'.json'), 'w') as outfile:
-            json.dump([{'epoch': args.start_epoch, 'acc_test': acc_test, 'oacc_test': oacc_test, 'avg_iou_test': avg_iou_test,
-                        'per_class_iou_test': per_class_iou_test, 'avg_acc_test': avg_acc_test}], outfile)
-        np.save(os.path.join(args.odir, 'pointwise_cm.npy'), confusion_matrix)
+            json.dump([{'epoch': args.start_epoch, 'acc_test': metrics_test['acc'], 'oacc_test': metrics_test['oacc'],
+                        'avg_iou_test': metrics_test['avg_iou'], 'per_class_iou_test': metrics_test['per_class_iou'],
+                        'avg_acc_test': metrics_test['avg_acc']}], outfile)
+        np.save(os.path.join(args.odir, 'pointwise_cm.npy'), metrics_test['confusion_matrix'])
 
 
 def resume(args, dbinfo):
@@ -418,16 +421,17 @@ def resume(args, dbinfo):
     
     model = create_model(checkpoint['args'], dbinfo)  # use original arguments, architecture can't change
     optimizer = create_optimizer(args, model)
-    
-    # model.load_state_dict(checkpoint['state_dict'])
+
+    model.load_state_dict(checkpoint['state_dict'])
     # to ensure compatbility of previous trained models with new InstanceNormD behavior
     # comment line below and uncomment line above if not using our trained  models
-    model.load_state_dict({k: checkpoint['state_dict'][k] for k in checkpoint['state_dict'] if k not in ['ecc.0._cell.inh.running_mean',
-                                                                                                         'ecc.0._cell.inh.running_var',
-                                                                                                         'ecc.0._cell.ini.running_mean',
-                                                                                                         'ecc.0._cell.ini.running_var']})
+    # model.load_state_dict({k: checkpoint['state_dict'][k] for k in checkpoint['state_dict'] if k not in ['ecc.0._cell.inh.running_mean',
+    #                                                                                                      'ecc.0._cell.inh.running_var',
+    #                                                                                                      'ecc.0._cell.ini.running_mean',
+    #                                                                                                      'ecc.0._cell.ini.running_var']})
 
-    if 'optimizer' in checkpoint: optimizer.load_state_dict(checkpoint['optimizer'])
+    if 'optimizer' in checkpoint:
+        optimizer.load_state_dict(checkpoint['optimizer'])
     for group in optimizer.param_groups:
         group['initial_lr'] = args.lr
     args.start_epoch = checkpoint['epoch']

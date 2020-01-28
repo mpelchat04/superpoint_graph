@@ -25,17 +25,22 @@ def create_fnet(widths, orthoinit, llbias, bnidx=-1):
     fnet_modules = []
     for k in range(len(widths)-2):
         fnet_modules.append(nn.Linear(widths[k], widths[k+1]))
-        if orthoinit: init.orthogonal_(fnet_modules[-1].weight, gain=init.calculate_gain('relu'))
-        if bnidx == k: fnet_modules.append(nn.BatchNorm1d(widths[k+1]))
+        if orthoinit:
+            init.orthogonal_(fnet_modules[-1].weight, gain=init.calculate_gain('relu'))
+        if bnidx == k:
+            fnet_modules.append(nn.BatchNorm1d(widths[k+1]))
         fnet_modules.append(nn.ReLU(True))
     fnet_modules.append(nn.Linear(widths[-2], widths[-1], bias=llbias))
-    if orthoinit: init.orthogonal_(fnet_modules[-1].weight)
-    if bnidx == len(widths)-1: fnet_modules.append(nn.BatchNorm1d(fnet_modules[-1].weight.size(0)))
+    if orthoinit:
+        init.orthogonal_(fnet_modules[-1].weight)
+    if bnidx == len(widths)-1:
+        fnet_modules.append(nn.BatchNorm1d(fnet_modules[-1].weight.size(0)))
     return nn.Sequential(*fnet_modules)
 
 
 class GraphNetwork(nn.Module):
-    """ It is constructed in a flexible way based on `config` string, which contains sequence of comma-delimited layer definiton tokens layer_arg1_arg2_... See README.md for examples.
+    """ It is constructed in a flexible way based on `config` string, which contains sequence of comma-delimited layer definiton
+    tokens layer_arg1_arg2_... See README.md for examples.
     """
     def __init__(self, config, nfeat, fnet_widths, fnet_orthoinit=True, fnet_llbias=True, fnet_bnidx=-1, edge_mem_limit=1e20, use_pyg=True, cuda=True):
         super(GraphNetwork, self).__init__()
@@ -48,7 +53,7 @@ class GraphNetwork(nn.Module):
                 self.add_module(str(d), nn.Linear(nfeat, int(conf[1])))
                 nfeat = int(conf[1])
             elif conf[0] == 'b':  # Batch norm;             args: not_affine
-                self.add_module(str(d), nn.BatchNorm1d(nfeat, eps=1e-5, affine=len(conf)==1))
+                self.add_module(str(d), nn.BatchNorm1d(nfeat, eps=1e-5, affine=len(conf) == 1))
             elif conf[0] == 'r':  # ReLU;
                 self.add_module(str(d), nn.ReLU(True))
             elif conf[0] == 'd':  # Dropout;                args: dropout_prob
@@ -71,29 +76,30 @@ class GraphNetwork(nn.Module):
                 cat_all = bool(int(conf[5])) if len(conf) > 5 else True
 
                 fnet = create_fnet(fnet_widths + [nfeat**2 if not vv else nfeat], fnet_orthoinit, fnet_llbias, fnet_bnidx)
-                if conf[0]=='gru':
+                if conf[0] == 'gru':
                     cell = GRUCellEx(nfeat, nfeat, bias=True, layernorm=layernorm, ingate=ingate)
                 else:
                     cell = LSTMCellEx(nfeat, nfeat, bias=True, layernorm=layernorm, ingate=ingate)
-                gconv = RNNGraphConvModule(cell, fnet, nfeat, vv = vv, nrepeats=nrepeats, cat_all=cat_all, edge_mem_limit=edge_mem_limit, use_pyg = use_pyg, cuda = cuda)
+                gconv = RNNGraphConvModule(cell, fnet, nfeat, vv=vv, nrepeats=nrepeats, cat_all=cat_all, edge_mem_limit=edge_mem_limit,
+                                           use_pyg=use_pyg, cuda=cuda)
                 self.add_module(str(d), gconv)
                 self.gconvs.append(gconv)
-                if cat_all: nfeat *= nrepeats + 1
+                if cat_all:
+                    nfeat *= nrepeats + 1
 
-            elif len(conf[0])>0:
+            elif len(conf[0]) > 0:
                 raise NotImplementedError('Unknown module: ' + conf[0])
-
 
     def set_info(self, gc_infos, cuda):
         """ Provides convolution modules with graph structure information for the current batch.
         """
-        gc_infos = gc_infos if isinstance(gc_infos,(list,tuple)) else [gc_infos]
-        for i,gc in enumerate(self.gconvs):
-            if cuda: gc_infos[i].cuda()
+        gc_infos = gc_infos if isinstance(gc_infos, (list, tuple)) else [gc_infos]
+        for i, gc in enumerate(self.gconvs):
+            if cuda:
+                gc_infos[i].cuda()
             gc.set_info(gc_infos[i])
 
     def forward(self, input):
         for module in self._modules.values():
             input = module(input)
         return input
-

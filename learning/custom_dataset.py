@@ -27,6 +27,11 @@ import spg
 def get_datasets(args, test_seed_offset=0):
     """build training and testing set"""
 
+    testlist, trainlist, validlist = [], [], []
+
+    validation_set = ['file1.laz', 'file2.laz', 'file3.laz']
+    test_set = ['tstfile1.laz', 'tstfile2.laz']
+
     # for a simple train/test organization
     trainset = ['train/' + f for f in os.listdir(args.CUSTOM_SET_PATH + '/superpoint_graphs/train')]
     testset = ['test/' + f for f in os.listdir(args.CUSTOM_SET_PATH + '/superpoint_graphs/train')]

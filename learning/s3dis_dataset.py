@@ -38,15 +38,17 @@ def get_datasets(args, test_seed_offset=0):
         if n != args.cvfold:
             path = '{}/superpoint_graphs/Area_{:d}/'.format(args.S3DIS_PATH, n)
             for fname in sorted(os.listdir(path)):
+
                 if fname.endswith(".h5") and not (args.use_val_set and fname in valid_names):
                     # training set
                     trainlist.append(spg.spg_reader(args, path + fname, True))
-                if fname.endswith(".h5") and (args.use_val_set  and fname in valid_names):
+
+                if fname.endswith(".h5") and (args.use_val_set and fname in valid_names):
                     # validation set
                     validlist.append(spg.spg_reader(args, path + fname, True))
     path = '{}/superpoint_graphs/Area_{:d}/'.format(args.S3DIS_PATH, args.cvfold)
     
-    # evaluation set
+    # Test set
     for fname in sorted(os.listdir(path)):
         if fname.endswith(".h5"):
             testlist.append(spg.spg_reader(args, path + fname, True))
@@ -96,7 +98,7 @@ def preprocess_pointclouds(args):
     """ Preprocesses data by splitting them by components and normalizing."""
     S3DIS_PATH = args.S3DIS_PATH
     class_count = np.zeros((13, 6), dtype='int')
-    for n in range(1,7):
+    for n in range(1, 7):
         pathP = '{}/parsed/Area_{:d}/'.format(S3DIS_PATH, n)
         if args.supervized_partition:
             pathD = '{}/features_supervision/Area_{:d}/'.format(S3DIS_PATH, n)
