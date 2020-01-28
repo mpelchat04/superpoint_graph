@@ -249,7 +249,7 @@ def format_classes(labels):
     # Dict containing the mapping of input (from the .las file) and the output classes (for the training part).
     # 6: Building, 9: water, 2: ground.
     coi = {'6': 1, '9': 2, '2': 3}
-    labels2 = np.empty(shape=labels.shape, dtype=int)
+    labels2 = np.zeros(shape=labels.shape, dtype=int)
     for key, value in coi.items():
         labels2[labels == int(key)] = value
 
