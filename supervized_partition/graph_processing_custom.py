@@ -99,6 +99,7 @@ def main():
                 # --- read the data files and compute the labels---
                 if args.dataset == 'airborne_lidar':
                     xyz, nb_return, intensity, label = read_airborne_lidar_format(data_file)
+
                 if args.dataset == 's3dis':
                     xyz, rgb, labels, objects = read_s3dis_format(data_file)
                     if pruning:

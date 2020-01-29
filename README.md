@@ -2,7 +2,7 @@
 # Large-scale Point Cloud Semantic Segmentation with Superpoint Graphs
 
 
-This is the official PyTorch implementation of the papers:
+This is a PyTorch implementation of the papers:
 
 *Large-scale Point Cloud Semantic Segmentation with Superpoint Graphs* <http://arxiv.org/abs/1711.09869>
 
@@ -18,7 +18,9 @@ by Loic Landrieu and Mohamed Boussaha (CVPR2019),
 
 <img src="http://recherche.ign.fr/llandrieu/SPG/ssp.png" width="900">
 
-## We are recruting! A PhD student for an extension of SPG to 4D data, see the [proposal](http://recherche.ign.fr/llandrieu/PhD_proposal_READY3D.pdf).
+#  
+  
+> Note: This work is derived from the original implementation of [Landrieu](https://github.com/loicland/superpoint_graph).
 
 
 ## Code structure

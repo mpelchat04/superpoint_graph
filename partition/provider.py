@@ -527,7 +527,7 @@ def write_ply(filename, xyz, rgb):
     ply.write(filename)
 
 
-def write_features(file_name, geof, xyz, rgb, graph_nn, labels):
+def write_features(file_name, geof, xyz, rgb, graph_nn, labels, intensity, nb_return):
     """write the geometric features, labels and clouds in a h5 file"""
     if os.path.isfile(file_name):
         os.remove(file_name)
@@ -543,6 +543,15 @@ def write_features(file_name, geof, xyz, rgb, graph_nn, labels):
         data_file.create_dataset('labels', data=labels, dtype='uint32')
     else:
         data_file.create_dataset('labels', data=labels, dtype='uint8')
+
+    # Enables the use of intensity
+    if len(intensity) > 0:
+        data_file.create_dataset('intensity', data=intensity, dtype='float32')
+
+    # Enables the use of the number of return.
+    if len(nb_return) > 0:
+        data_file.create_dataset('nb_return', data=nb_return, dtype='uint8')
+
     data_file.close()
 
 
@@ -564,11 +573,22 @@ def read_features(file_name):
     source = data_file["source"][:]
     target = data_file["target"][:]
 
+    # Manage intensity and number of returns
+    if data_file["intensity"]:
+        intensity = data_file["intensity"][:]
+    else:
+        intensity = []
+
+    if data_file["nb_return"]:
+        nb_return = data_file["nb_return"]
+    else:
+        nb_return = []
+
     # ---set the graph---
     graph_nn = dict([("is_nn", True)])
     graph_nn["source"] = source
     graph_nn["target"] = target
-    return geof, xyz, rgb, graph_nn, labels
+    return geof, xyz, rgb, graph_nn, labels, intensity, nb_return
 
 
 def write_spg(file_name, graph_sp, components, in_component):
