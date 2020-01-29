@@ -569,18 +569,22 @@ def read_features(file_name):
     # ---fill the arrays---
     geof = data_file["geof"][:]
     xyz = data_file["xyz"][:]
-    rgb = data_file["rgb"][:]
+    if 'rgb' in data_file:
+        rgb = data_file["rgb"][:]
+    else:
+        rgb = []
     source = data_file["source"][:]
     target = data_file["target"][:]
+    distance = data_file["distances"][:]
 
     # Manage intensity and number of returns
-    if data_file["intensity"]:
+    if 'intensity' in data_file:
         intensity = data_file["intensity"][:]
     else:
         intensity = []
 
-    if data_file["nb_return"]:
-        nb_return = data_file["nb_return"]
+    if 'nb_return' in data_file:
+        nb_return = data_file["nb_return"][:]
     else:
         nb_return = []
 
@@ -588,6 +592,7 @@ def read_features(file_name):
     graph_nn = dict([("is_nn", True)])
     graph_nn["source"] = source
     graph_nn["target"] = target
+    graph_nn["distances"] = distance
     return geof, xyz, rgb, graph_nn, labels, intensity, nb_return
 
 

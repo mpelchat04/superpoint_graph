@@ -44,8 +44,8 @@ else:
 
 times = [0, 0, 0]  # time for computing: features / partition / spg
 
-if not os.path.isdir(root + "data"):
-    os.mkdir(root + "data")
+if not os.path.isdir(root + "clouds"):
+    os.mkdir(root + "clouds")
 if not os.path.isdir(root + "features"):
     os.mkdir(root + "features")
 if not os.path.isdir(root + "superpoint_graphs"):
@@ -112,7 +112,7 @@ for folder in folders:
             times[0] = times[0] + end - start
             del target_fea
 
-            write_features(file_name=fea_file, geof=geof, xyz=xyz, rgb=None,
+            write_features(file_name=fea_file, geof=geof, xyz=xyz, rgb=rgb,
                            graph_nn=graph_nn, labels=labels, intensity=intensity, nb_return=nb_return)
 
         # --compute the partition------
@@ -127,7 +127,7 @@ for folder in folders:
 
             # choose here which features to use for the partition
             # In this examples, will use linearity, planarity, scattering, verticality, normalized intensity and number of returns.
-            features = np.stack((geof, (intensity / max(intensity)), nb_return)).astype('float32')
+            features = np.concatenate((geof, (intensity / max(intensity)), nb_return), axis=1).astype('float32')
             # geof[:, 3] = 2. * geof[:, 3]
 
             graph_nn["edge_weight"] = np.array(1. / (args.lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])),
