@@ -40,7 +40,7 @@ if args.dataset == 'airborne_lidar':
     folders = ["trn/", "val/", "tst/"]
     n_labels = 4
 else:
-    raise ValueError('%s is an unknown data set' % dataset)
+    raise ValueError('%s is an unknown data set' % args.dataset)
 
 times = [0, 0, 0]  # time for computing: features / partition / spg
 

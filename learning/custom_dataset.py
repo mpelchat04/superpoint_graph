@@ -89,6 +89,7 @@ def preprocess_pointclouds(SEMA3D_PATH):
                 f = h5py.File(pathD + file, 'r')
                 xyz = f['xyz'][:]
                 rgb = f['rgb'][:].astype(np.float)
+                # elspv = elevation, linearity, planarity, scattering, verticality
                 elpsv = np.stack([f['xyz'][:, 2][:], f['linearity'][:], f['planarity'][:], f['scattering'][:], f['verticality'][:]], axis=1)
 
                 # rescale to [-0.5,0.5]; keep xyz

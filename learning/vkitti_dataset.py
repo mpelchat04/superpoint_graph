@@ -15,26 +15,27 @@ import functools
 import torch
 import torchnet as tnt
 import h5py
-import spg
+import learning.spg as spg
+
 
 def get_datasets(args, test_seed_offset=0):
     """ Gets training and test datasets. """
 
     # Load superpoints graphs
     testlist, trainlist, validlist = [], [], []
-    valid_names = ['0001_00000.h5','0001_00085.h5', '0001_00170.h5','0001_00230.h5','0001_00325.h5','0001_00420.h5', \
-                   '0002_00000.h5','0002_00111.h5','0002_00223.h5','0018_00030.h5','0018_00184.h5','0018_00338.h5',\
-                   '0020_00080.h5','0020_00262.h5','0020_00444.h5','0020_00542.h5','0020_00692.h5', '0020_00800.h5']
-    
-    for n in range(1,7):
+    valid_names = ['0001_00000.h5', '0001_00085.h5', '0001_00170.h5', '0001_00230.h5', '0001_00325.h5', '0001_00420.h5',
+                   '0002_00000.h5', '0002_00111.h5', '0002_00223.h5', '0018_00030.h5', '0018_00184.h5', '0018_00338.h5',
+                   '0020_00080.h5', '0020_00262.h5', '0020_00444.h5', '0020_00542.h5', '0020_00692.h5', '0020_00800.h5']
+
+    for n in range(1, 7):
         if n != args.cvfold:
             path = '{}/superpoint_graphs/0{:d}/'.format(args.VKITTI_PATH, n)
             for fname in sorted(os.listdir(path)):
                 if fname.endswith(".h5") and not (args.use_val_set and fname in valid_names):
-                    #training set
+                    # training set
                     trainlist.append(spg.spg_reader(args, path + fname, True))
                 if fname.endswith(".h5") and (args.use_val_set  and fname in valid_names):
-                    #validation set
+                    # validation set
                     validlist.append(spg.spg_reader(args, path + fname, True))
     path = '{}/superpoint_graphs/0{:d}/'.format(args.VKITTI_PATH, args.cvfold)
     #evaluation set
@@ -80,10 +81,11 @@ def get_info(args):
         'inv_class_map': {0:'Terrain', 1:'Tree', 2:'Vegetation', 3:'Building', 4:'Road', 5:'GuardRail', 6:'TrafficSign', 7:'TrafficLight', 8:'Pole', 9:'Misc', 10:'Truck', 11:'Car', 12:'Van'},
     }
 
+
 def preprocess_pointclouds(VKITTI_PATH):
     """ Preprocesses data by splitting them by components and normalizing."""
-    class_count = np.zeros((13,6),dtype='int')
-    for n in range(1,7):
+    class_count = np.zeros((13, 6), dtype='int')
+    for n in range(1, 7):
         pathP = '{}/parsed/0{:d}/'.format(VKITTI_PATH, n)
         pathD = '{}/features_supervision/0{:d}/'.format(VKITTI_PATH, n)
         pathC = '{}/superpoint_graphs/0{:d}/'.format(VKITTI_PATH, n)
@@ -101,9 +103,9 @@ def preprocess_pointclouds(VKITTI_PATH):
                 labels = f['labels'][:]
                 hard_labels = np.argmax(labels[:,1:],1)
                 label_count = np.bincount(hard_labels, minlength=13)
-                class_count[:,n-1] = class_count[:,n-1] + label_count
+                class_count[:, n-1] = class_count[:, n-1] + label_count
                 
-                e = (f['xyz'][:,2][:] -  np.min(f['xyz'][:,2]))/ (np.max(f['xyz'][:,2]) -  np.min(f['xyz'][:,2]))-0.5
+                e = (f['xyz'][:, 2][:] - np.min(f['xyz'][:, 2])) / (np.max(f['xyz'][:, 2]) - np.min(f['xyz'][:, 2]))-0.5
 
                 rgb = rgb/255.0 - 0.5
                 
@@ -120,7 +122,7 @@ def preprocess_pointclouds(VKITTI_PATH):
                     hf.create_dataset(name='centroid',data=xyz.mean(0))
                     for c in range(numc):
                         idx = f['components/{:d}'.format(c)][:].flatten()
-                        if idx.size > 10000: # trim extra large segments, just for speed-up of loading time
+                        if idx.size > 10000:  # trim extra large segments, just for speed-up of loading time
                             ii = random.sample(range(idx.size), k=10000)
                             idx = idx[ii]
 
@@ -128,6 +130,7 @@ def preprocess_pointclouds(VKITTI_PATH):
     path = '{}/parsed/'.format(VKITTI_PATH)
     data_file = h5py.File(path+'class_count.h5', 'w')
     data_file.create_dataset('class_count', data=class_count, dtype='int')
+
 
 if __name__ == "__main__":
     import argparse
