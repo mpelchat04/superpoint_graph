@@ -47,7 +47,6 @@ class GraphConvInfo(object):
         edgeattrs = defaultdict(list)
                 
         for G in graphs:
-            # print(G.get_edgelist())
             E = np.array(G.get_edgelist())
             idx = E[:, 1].argsort()  # sort by target
             
