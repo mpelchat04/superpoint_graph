@@ -93,7 +93,7 @@ def preprocess_pointclouds(folder):
     """ Preprocesses data by splitting them by components and normalizing."""
 
     # folder = /wspace/disk01/lidar/POINTCLOUD
-    class_count = np.zeros((4,), dtype='int')
+    class_count = np.zeros((5,), dtype='int')
     for dataset in ['trn', 'val', 'tst']:
         path_parsed = f"{folder}/parsed/{dataset}/"
         path_feat = f"{folder}/features/{dataset}/"
