@@ -12,7 +12,8 @@ import igraph
 import torch
 from collections import defaultdict
 import numpy as np
-    
+
+
 class GraphConvInfo(object):          
     """ Holds information about the structure of graph(s) in a vectorized form useful to `GraphConvModule`. 
     
@@ -22,12 +23,12 @@ class GraphConvInfo(object):
     """
 
     def __init__(self, *args, **kwargs):
-        self._idxn = None           #indices into input tensor of convolution (node features)
-        self._idxe = None           #indices into edge features tensor (or None if it would be linear, i.e. no compaction)
-        self._degrees = None        #in-degrees of output nodes (slices _idxn and _idxe)
+        self._idxn = None           # indices into input tensor of convolution (node features)
+        self._idxe = None           # indices into edge features tensor (or None if it would be linear, i.e. no compaction)
+        self._degrees = None        # in-degrees of output nodes (slices _idxn and _idxe)
         self._degrees_gpu = None
-        self._edgefeats = None      #edge features tensor (to be processed by feature-generating network)
-        if len(args)>0 or len(kwargs)>0:
+        self._edgefeats = None      # edge features tensor (to be processed by feature-generating network)
+        if len(args) > 0 or len(kwargs) > 0:
             self.set_batch(*args, **kwargs)
       
     def set_batch(self, graphs, edge_feat_func):
@@ -38,7 +39,7 @@ class GraphConvInfo(object):
         edge_feat_func: see class description.
         """
         
-        graphs = graphs if isinstance(graphs,(list,tuple)) else [graphs]
+        graphs = graphs if isinstance(graphs, (list, tuple)) else [graphs]
         p = 0
         idxn = []
         degrees = []
@@ -46,10 +47,11 @@ class GraphConvInfo(object):
         edgeattrs = defaultdict(list)
                 
         for G in graphs:
+            # print(G.get_edgelist())
             E = np.array(G.get_edgelist())
-            idx = E[:,1].argsort() # sort by target
+            idx = E[:, 1].argsort()  # sort by target
             
-            idxn.append(p + E[idx,0])
+            idxn.append(p + E[idx, 0])
             edgeseq = G.es[idx.tolist()]
             for a in G.es.attributes():
                 edgeattrs[a] += edgeseq.get_attribute_values(a)

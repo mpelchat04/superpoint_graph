@@ -66,18 +66,18 @@ def scaler01(trainlist, testlist, transform_train=True, validlist=[]):
 
 def scaler_custom(dataset_dict, transform_train=True):
     """ Scale edge features to 0 mean 1 stddev """
-    edge_feats = np.concatenate([trainlist[i][3] for i in range(len(trainlist))], 0)
+    edge_feats = np.concatenate([dataset_dict['trn'][i][3] for i in range(len(dataset_dict['trn']))], 0)
     scaler = preprocessing.StandardScaler().fit(edge_feats)
 
     if transform_train:
-        for i in range(len(trainlist)):
-            scaler.transform(trainlist[i][3], copy=False)
-    for i in range(len(testlist)):
-        scaler.transform(testlist[i][3], copy=False)
-    if len(validlist) > 0:
-        for i in range(len(validlist)):
-            scaler.transform(validlist[i][3], copy=False)
-    return trainlist, testlist, validlist, scaler
+        for i in range(len(dataset_dict['trn'])):
+            scaler.transform(dataset_dict['trn'][i][3], copy=False)
+    for i in range(len(dataset_dict['tst'])):
+        scaler.transform(dataset_dict['tst'][i][3], copy=False)
+    if len(dataset_dict['val']) > 0:
+        for i in range(len(dataset_dict['val'])):
+            scaler.transform(dataset_dict['val'][i][3], copy=False)
+    return dataset_dict, scaler
 
 
 def spg_reader(args, fname, incl_dir_in_name=False):
@@ -153,7 +153,8 @@ def loader(entry, train, args, db_path, test_seed_offset=0):
     # 1) subset (neighborhood) selection of (permuted) superpoint graph
     if train:
         if 0 < args.spg_augm_hardcutoff < G.vcount():
-            perm = list(range(G.vcount())); random.shuffle(perm)
+            perm = list(range(G.vcount()))
+            random.shuffle(perm)
             G = G.permute_vertices(perm)
 
         if 0 < args.spg_augm_nneigh < G.vcount():
@@ -224,7 +225,7 @@ def load_superpoint(args, fname, id, train, test_seed_offset):
 
     if args.pc_xyznormalize:
         # normalize xyz into unit ball, i.e. in [-0.5,0.5]
-        diameter = np.max(np.max(P[:, :3],axis=0) - np.min(P[:, :3],axis=0))
+        diameter = np.max(np.max(P[:, :3], axis=0) - np.min(P[:, :3], axis=0))
         P[:, :3] = (P[:, :3] - np.mean(P[:, :3], axis=0, keepdims=True)) / (diameter + 1e-10)
     else:
         diameter = 0.0
@@ -234,16 +235,27 @@ def load_superpoint(args, fname, id, train, test_seed_offset):
         columns = []
         if 'xyz' in args.pc_attribs:
             columns.append(P[:, :3])
-        if 'rgb' in args.pc_attribs:
-            columns.append(P[:, 3:6])
-        if 'e' in args.pc_attribs:
-            columns.append(P[:, 6, None])
-        if 'lpsv' in args.pc_attribs:
-            columns.append(P[:, 7:11])
-        if 'XYZ' in args.pc_attribs:
-            columns.append(P[:, 11:14])
-        if 'd' in args.pc_attribs:
-            columns.append(P[:, 14])
+
+        if args.dataset == 'airborne_lidar':
+            if 'i' in args.pc_attribs:
+                columns.append(P[:, 3, None])
+            if 'r' in args.pc_attribs:
+                columns.append(P[:, 4, None])
+            if 'lpsv' in args.pc_attribs:
+                columns.append(P[:, 5:9])
+
+        else:
+            if 'rgb' in args.pc_attribs:
+                columns.append(P[:, 3:6])
+            if 'e' in args.pc_attribs:
+                columns.append(P[:, 6, None])
+            if 'lpsv' in args.pc_attribs:
+                columns.append(P[:, 7:11])
+            if 'XYZ' in args.pc_attribs:
+                columns.append(P[:, 11:14])
+            if 'd' in args.pc_attribs:
+                columns.append(P[:, 14])
+
         P = np.concatenate(columns, axis=1)
 
     if train:

@@ -44,7 +44,7 @@ def parse_args():
     parser.add_argument('--wd', default=0, type=float, help='Weight decay')
     parser.add_argument('--lr', default=1e-2, type=float, help='Initial learning rate')
     parser.add_argument('--lr_decay', default=0.7, type=float, help='Multiplicative factor used on learning rate at `lr_steps`')
-    parser.add_argument('--lr_steps', default='[]', help='List of epochs where the learning rate is decreased by `lr_decay`')
+    parser.add_argument('--lr_steps', default='[275,320]', help='List of epochs where the learning rate is decreased by `lr_decay`')
     parser.add_argument('--momentum', default=0.9, type=float, help='Momentum')
     parser.add_argument('--epochs', default=10, type=int, help='Number of epochs to train. If <=0, only testing will be done.')
     parser.add_argument('--batch_size', default=2, type=int, help='Batch size')
@@ -62,20 +62,17 @@ def parse_args():
 
     # Dataset
     parser.add_argument('--dataset', default='airborne_lidar', help='Dataset name: airborne_lidar')
-    parser.add_argument('--cvfold', default=0, type=int, help='Fold left-out for testing in leave-one-out setting (S3DIS)')
+    parser.add_argument('--cvfold', default=1, type=int, help='Fold left-out for testing in leave-one-out setting (S3DIS)')
     parser.add_argument('--odir', default='results', help='Directory to store results')
     parser.add_argument('--resume', default='', help='Loads a previously saved model.')
     parser.add_argument('--db_train_name', default='train')
     parser.add_argument('--db_test_name', default='test')
     parser.add_argument('--use_val_set', type=int, default=0)
     parser.add_argument('--AIRBORNE_LIDAR_PATH', default='datasets/airborne_lidar')
-    parser.add_argument('--S3DIS_PATH', default='datasets/s3dis')
-    parser.add_argument('--VKITTI_PATH', default='datasets/vkitti')
-    parser.add_argument('--CUSTOM_SET_PATH', default='datasets/custom_set')
     parser.add_argument('--use_pyg', default=0, type=int, help='Wether to use Pytorch Geometric for graph convolutions')
 
     # Model
-    parser.add_argument('--model_config', default='gru_10,f_8',
+    parser.add_argument('--model_config', default='gru_10_0,f_4',
                         help='Defines the model as a sequence of layers, see graphnet.py for definitions of respective layers and acceptable '
                              'arguments. In short: rectype_repeats_mv_layernorm_ingate_concat, with rectype the type of recurrent unit '
                              '[gru/crf/lstm], repeats the number of message passing iterations, mv (default True) the use of matrix-vector (mv) '
@@ -86,14 +83,13 @@ def parse_args():
                         help='Edge attribute definition, see spg_edge features() in spg.py for definitions.')
 
     # Point cloud processing
-    parser.add_argument('--pc_attribs', default='xyzrgbelpsvXYZ', help='Point attributes fed to PointNets, if empty then all possible. '
-                                                                       'xyz = coordinates, rgb = color, e = elevation, lpsv = geometric feature, '
-                                                                       'd = distance to center')
+    parser.add_argument('--pc_attribs', default='xyzirlpsv', help='Point attributes fed to PointNets, if empty then all possible. '
+                                                              'xyz = coordinates, i = intensity, r = number of return, lpsv = geometric features')
     parser.add_argument('--pc_augm_scale', default=0, type=float, help='Training augmentation: Uniformly random scaling in [1/scale, scale]')
     parser.add_argument('--pc_augm_rot', default=1, type=int, help='Training augmentation: Bool, random rotation around z-axis')
     parser.add_argument('--pc_augm_mirror_prob', default=0, type=float, help='Training augmentation: Probability of mirroring about x or y axes')
-    parser.add_argument('--pc_augm_jitter', default=1, type=int, help='Training augmentation: Bool, Gaussian jittering of all attributes')
-    parser.add_argument('--pc_xyznormalize', default=1, type=int, help='Bool, normalize xyz into unit ball, i.e. in [-0.5,0.5]')
+    parser.add_argument('--pc_augm_jitter', default=0, type=int, help='Training augmentation: Bool, Gaussian jittering of all attributes')
+    parser.add_argument('--pc_xyznormalize', default=0, type=int, help='Bool, normalize xyz into unit ball, i.e. in [-0.5,0.5]')
 
     # Filter generating network
     parser.add_argument('--fnet_widths', default='[32,128,64]', help='List of width of hidden filter gen net layers '
@@ -106,7 +102,7 @@ def parse_args():
 
     # Superpoint graph
     parser.add_argument('--spg_attribs01', default=1, type=int, help='Bool, normalize edge features to 0 mean 1 deviation')
-    parser.add_argument('--spg_augm_nneigh', default=100, type=int, help='Number of neighborhoods to sample in SPG')
+    parser.add_argument('--spg_augm_nneigh', default=50, type=int, help='Number of neighborhoods to sample in SPG')
     parser.add_argument('--spg_augm_order', default=3, type=int, help='Order of neighborhoods to sample in SPG')
     parser.add_argument('--spg_augm_hardcutoff', default=512, type=int, help='Maximum number of superpoints larger than args.ptn_minpts '
                                                                              'to sample in SPG')
@@ -118,7 +114,7 @@ def parse_args():
     parser.add_argument('--ptn_npts', default=128, type=int, help='Number of input points for PointNet.')
     parser.add_argument('--ptn_widths', default='[[64,64,128,128,256], [256,64,32]]', help='PointNet widths')
     parser.add_argument('--ptn_widths_stn', default='[[64,64,128], [128,64]]', help='PointNet\'s Transformer widths')
-    parser.add_argument('--ptn_nfeat_stn', default=11, type=int, help='PointNet\'s Transformer number of input features')
+    parser.add_argument('--ptn_nfeat_stn', default=9, type=int, help='PointNet\'s Transformer number of input features')
     parser.add_argument('--ptn_prelast_do', default=0, type=float)
     parser.add_argument('--ptn_mem_monger', default=1, type=int, help='Bool, save GPU memory by recomputing PointNets in back propagation.')
 
@@ -155,18 +151,6 @@ def main():
         import learning.airborne_lidar_dataset as lidar_dataset
         dbinfo = lidar_dataset.get_info(args)
         create_dataset = lidar_dataset.get_datasets
-    elif args.dataset == 's3dis':
-        import s3dis_dataset
-        dbinfo = s3dis_dataset.get_info(args)
-        create_dataset = s3dis_dataset.get_datasets
-    elif args.dataset == 'vkitti':
-        import vkitti_dataset
-        dbinfo = vkitti_dataset.get_info(args)
-        create_dataset = vkitti_dataset.get_datasets
-    elif args.dataset == 'custom_dataset':
-        import custom_dataset  # <- to write!
-        dbinfo = custom_dataset.get_info(args)
-        create_dataset = custom_dataset.get_datasets
     else:
         raise NotImplementedError('Unknown dataset ' + args.dataset)
 
@@ -182,8 +166,8 @@ def main():
 
     train_dataset, test_dataset, valid_dataset, scaler = create_dataset(args)
 
-    print(f"Train dataset: {len(train_dataset)} elements - Test dataset: {len(test_dataset)} elements - "
-          f"Validation dataset: {len(valid_dataset)} elements")
+    print(f"Number of elements in each dataset:\n Train dataset: {len(train_dataset)}\n Test dataset: {len(test_dataset)}"
+          f"\n Validation dataset: {len(valid_dataset)} ")
     ptnCloudEmbedder = pointnet.CloudEmbedder(args)
     scheduler = MultiStepLR(optimizer, milestones=args.lr_steps, gamma=args.lr_decay, last_epoch=args.start_epoch - 1)
 
@@ -345,9 +329,9 @@ def main():
 
     for epoch in range(args.start_epoch, args.epochs):
         print(f"Epoch {epoch}/{args.epochs} ({args.odir})")
-        scheduler.step()
 
         metrics_trn = train()
+        scheduler.step()
 
         print(TRAIN_COLOR + f"-> Train Loss: {metrics_trn['loss']:.4f}  Train accuracy: {metrics_trn['acc']:.2f}%")
 
@@ -355,8 +339,8 @@ def main():
         if args.use_val_set:
             metrics_eval = eval(True)
             print(VAL_COLOR + f"-> Val Loss: {metrics_eval['loss']:.4f}  Val accuracy: {metrics_eval['acc']:.2f}%  "
-            f"Val oAcc: {100 * metrics_eval['oacc']:.2f}%  Val IoU: {100 * metrics_eval['avg_iou']:.2f}%  "
-            f"best ioU: {100 * max(best_iou, metrics_eval['avg_iou']):.2f}%" + TRAIN_COLOR)
+                  f"Val oAcc: {100 * metrics_eval['oacc']:.2f}%  Val IoU: {100 * metrics_eval['avg_iou']:.2f}%  "
+                  f"best ioU: {100 * max(best_iou, metrics_eval['avg_iou']):.2f}%" + TRAIN_COLOR)
             if metrics_eval['avg_iou'] > best_iou:  # best score yet on the validation set
                 print(BEST_COLOR + '-> New best model achieved!' + TRAIN_COLOR)
                 best_iou = metrics_eval['avg_iou']
@@ -370,13 +354,13 @@ def main():
         # or test after each new model (but skip the first 5 for efficiency)
         if (not args.use_val_set and (epoch + 1) % args.test_nth_epoch == 0) or (args.use_val_set and new_best_model and epoch > 5):
             metrics_test = eval(False)
-            print(TEST_COLOR + f"-> Test Loss: {metrics_test['loss']:.4f}  Test accuracy: {metrics_test['acc']:.2f}%  "
+            print(TEST_COLOR + f"-> Test Loss: {metrics_test['loss']:.4f}  Test accuracy: {metrics_test['acc']:.2f}% "
             f"Test oAcc: {100 * metrics_test['oacc']:.2f}%  Test avgIoU: {100 * metrics_test['avg_iou']:.2f}%" + TRAIN_COLOR)
         else:
             metrics_test = {'acc': 0, 'loss': 0, 'oacc': 0, 'avg_iou': 0, 'avg_acc': 0}
 
         stats.append({'epoch': epoch, 'acc_trn': metrics_trn['acc'], 'loss_trn': metrics_trn['loss'], 'oacc_trn': metrics_trn['oacc'],
-                      'avg_iou_trn': metrics_trn['avg_iou'], 'acc_test': metrics_test['acc'], 'oacc_test': metrics_test['oacc_test'],
+                      'avg_iou_trn': metrics_trn['avg_iou'], 'acc_test': metrics_test['acc'], 'oacc_test': metrics_test['oacc'],
                       'avg_iou_test': metrics_test['avg_iou'], 'avg_acc_test': metrics_test['avg_acc'], 'best_iou': best_iou})
 
         if math.isnan(metrics_trn['loss']):

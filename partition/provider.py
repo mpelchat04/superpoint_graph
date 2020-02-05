@@ -29,10 +29,10 @@ from sklearn.decomposition import PCA
 
 def partition2ply(filename, xyz, components):
     """write a ply with random colors for each components"""
-    random_color = random.randint(0, 255)
+    random_color = random.randint
     color = np.zeros(xyz.shape)
     for i_com in range(0, len(components)):
-        color[components[i_com], :] = [random_color(), random_color(), random_color()]
+        color[components[i_com], :] = [random_color(0, 255), random_color(0, 255), random_color(0, 255)]
     prop = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
     vertex_all = np.empty(len(xyz), dtype=prop)
     for i in range(0, 3):
@@ -248,8 +248,9 @@ def format_classes(labels):
     # coi = classses of interest.
     # Dict containing the mapping of input (from the .las file) and the output classes (for the training part).
     # 6: Building, 9: water, 2: ground.
-    coi = {'6': 1, '9': 2, '2': 3}
-    labels2 = np.zeros(shape=labels.shape, dtype=int)
+    # All other values have to be set to 1. Details here: https://github.com/loicland/superpoint_graph/issues/83
+    coi = {'6': 2, '9': 3, '2': 4}
+    labels2 = np.full(shape=labels.shape, fill_value=1, dtype=int)
     for key, value in coi.items():
         labels2[labels == int(key)] = value
 

@@ -380,7 +380,7 @@ def main():
             metrics_test = {'acc': 0, 'loss': 0, 'oacc': 0, 'avg_iou': 0, 'avg_acc': 0}
 
         stats.append({'epoch': epoch, 'acc_trn': metrics_trn['acc'], 'loss_trn': metrics_trn['loss'], 'oacc_trn': metrics_trn['oacc'],
-                      'avg_iou_trn': metrics_trn['avg_iou'], 'acc_test': metrics_test['acc'], 'oacc_test': metrics_test['oacc_test'],
+                      'avg_iou_trn': metrics_trn['avg_iou'], 'acc_test': metrics_test['acc'], 'oacc_test': metrics_test['oacc'],
                       'avg_iou_test': metrics_test['avg_iou'], 'avg_acc_test': metrics_test['avg_acc'], 'best_iou': best_iou})
 
         if math.isnan(metrics_trn['loss']):

@@ -11,10 +11,12 @@ sys.path.append("./partition/")
 from provider import *
 import h5py
 import os
+import numpy as np
+
 parser = argparse.ArgumentParser(description='Large-scale Point Cloud Semantic Segmentation with Superpoint Graphs')
-parser.add_argument('--dataset', default='s3dis', help='dataset name: sema3d|s3dis')
-parser.add_argument('--ROOT_PATH', default='/mnt/bigdrive/loic/S3DIS', help='folder containing the ./data folder')
-parser.add_argument('--res_file', default='../models/cv1/predictions_val', help='folder containing the results')
+parser.add_argument('--dataset', default='airborne_lidar', help='dataset name: sema3d|s3dis')
+parser.add_argument('--ROOT_PATH', default='/wspace/disk01/lidar/POINTCLOUD', help='folder containing the ./data folder')
+parser.add_argument('--res_file', default='', help='folder containing the results')
 parser.add_argument('--supervized_partition', type=int,  default=0)
 parser.add_argument('--file_path', default='Area_1/conferenceRoom_1', help='file to output (must include the area / set in its path)')
 parser.add_argument('--upsample', default=0, type=int, help='if 1, upsample the prediction to the original cloud '
@@ -37,6 +39,8 @@ spg_out = 's' in args.output_type
 folder = os.path.split(args.file_path)[0] + '/'
 file_name = os.path.split(args.file_path)[1]
 
+if args.dataset == 'airborne_lidar':
+    n_labels = 4
 if args.dataset == 's3dis':
     n_labels = 13
 if args.dataset == 'sema3d':
@@ -61,7 +65,7 @@ if not os.path.isdir(ply_folder):
 if not os.path.isfile(fea_file):
     raise ValueError("%s does not exist and is needed" % fea_file)
     
-geof, xyz, rgb, graph_nn, labels = read_features(fea_file)
+geof, xyz, rgb, graph_nn, labels, intensity, nb_return = read_features(fea_file)
 
 if (par_out or res_out) and (not os.path.isfile(spg_file)):    
     raise ValueError("%s does not exist and is needed to output the partition or result ply" % spg_file)

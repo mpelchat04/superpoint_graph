@@ -16,7 +16,7 @@ import torch
 import torchnet as tnt
 import h5py
 import learning.spg as spg
-import glob
+import warnings
 import supervized_partition.graph_processing_custom as graph_processing
 
 
@@ -25,7 +25,7 @@ def get_datasets(args, test_seed_offset=0):
 
     # Load superpoints graphs
     # List all .las files in the folder
-    root = args.ROOT_PATH
+    root = args.AIRBORNE_LIDAR_PATH
 
     if args.dataset == 'airborne_lidar':
         folders = ["trn", "val", "tst"]
@@ -34,72 +34,29 @@ def get_datasets(args, test_seed_offset=0):
 
     dataset_dict = {'trn': [], 'val': [], 'tst': []}
     for folder in folders:
-        if not os.path.isdir(f"{root}/{folder}/"):
-            raise ValueError(f"{folder} does not exist.")
+        path_spg = f"{root}/superpoint_graphs/{folder}/"
+        if not os.path.isdir(f"{path_spg}/"):
+            raise ValueError(f"{path_spg} does not exist.")
 
-        path_spg = f"{root}/{folder}/superpoint_graphs/"
         for fname in sorted(os.listdir(path_spg)):
             if fname.endswith(".h5"):
                 dataset_dict[folder].append(spg.spg_reader(args=args, fname=(path_spg + fname), incl_dir_in_name=True))
 
+    # Normalize Edge features.
     if args.spg_attribs01:
-        trnlist, tstlist, validlist = spg.scaler01()
+        dataset_dict, scaler = spg.scaler_custom(dataset_dict, transform_train=True)
+    else:
+        warnings.warn(f"Normalize Edge attributes not set to True. Scaler will be set to None.")
+        scaler = None
 
-        print("=================\n   " + folder + "\n=================")
+    trn_dataset = tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in dataset_dict['trn']],
+                                          functools.partial(spg.loader, train=True, args=args, db_path=root))
+    val_dataset = tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in dataset_dict['val']],
+                                          functools.partial(spg.loader, train=True, args=args, db_path=root, test_seed_offset=test_seed_offset))
+    tst_dataset = tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in dataset_dict['tst']],
+                                          functools.partial(spg.loader, train=True, args=args, db_path=root, test_seed_offset=test_seed_offset))
 
-        data_folder = root + "data/" + folder
-        cloud_folder = root + "clouds/" + folder
-        fea_folder = root + "features/" + folder
-        spg_folder = root + "superpoint_graphs/" + folder
-        if not os.path.isdir(data_folder):
-            raise ValueError("%s does not exist" % data_folder)
-
-        if not os.path.isdir(cloud_folder):
-            os.mkdir(cloud_folder)
-        if not os.path.isdir(fea_folder):
-            os.mkdir(fea_folder)
-        if not os.path.isdir(spg_folder):
-            os.mkdir(spg_folder)
-        files = glob.glob(data_folder + "*.las")
-
-
-
-
-
-    testlist, trainlist, validlist = [], [], []
-    valid_names = ['0001_00000.h5', '0001_00085.h5', '0001_00170.h5', '0001_00230.h5', '0001_00325.h5', '0001_00420.h5',
-                   '0002_00000.h5', '0002_00111.h5', '0002_00223.h5', '0018_00030.h5', '0018_00184.h5', '0018_00338.h5',
-                   '0020_00080.h5', '0020_00262.h5', '0020_00444.h5', '0020_00542.h5', '0020_00692.h5', '0020_00800.h5']
-
-    for n in range(1, 7):
-        if n != args.cvfold:
-            path = '{}/superpoint_graphs/0{:d}/'.format(args.VKITTI_PATH, n)
-            for fname in sorted(os.listdir(path)):
-                if fname.endswith(".h5") and not (args.use_val_set and fname in valid_names):
-                    # training set
-                    trainlist.append(spg.spg_reader(args, path + fname, True))
-                if fname.endswith(".h5") and (args.use_val_set and fname in valid_names):
-                    # validation set
-                    validlist.append(spg.spg_reader(args, path + fname, True))
-    path = '{}/superpoint_graphs/0{:d}/'.format(args.VKITTI_PATH, args.cvfold)
-    # evaluation set
-    for fname in sorted(os.listdir(path)):
-        if fname.endswith(".h5"):
-            testlist.append(spg.spg_reader(args, path + fname, True))
-
-    # Normalize edge features
-    if args.spg_attribs01:
-        trainlist, testlist, validlist, scaler = spg.scaler01(trainlist, testlist, validlist=validlist)
-
-    return tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in trainlist],
-                                   functools.partial(spg.loader, train=True, args=args, db_path=args.VKITTI_PATH)), \
-           tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in testlist],
-                                   functools.partial(spg.loader, train=False, args=args, db_path=args.VKITTI_PATH,
-                                                     test_seed_offset=test_seed_offset)), \
-           tnt.dataset.ListDataset([spg.spg_to_igraph(*tlist) for tlist in validlist],
-                                   functools.partial(spg.loader, train=False, args=args, db_path=args.VKITTI_PATH,
-                                                     test_seed_offset=test_seed_offset)), \
-           scaler
+    return trn_dataset, tst_dataset, val_dataset, scaler
 
 
 def get_info(args):
@@ -167,9 +124,9 @@ def preprocess_pointclouds(folder):
                 norm_x = norm_x.reshape((norm_x.shape[0], 1))
                 norm_y = (xyz[:, 1] - np.min(xyz[:, 1])) / (np.max(xyz[:, 1] - np.min(xyz[:, 1])))
                 norm_y = norm_y.reshape((norm_y.shape[0], 1))
-
+                lspv = f["geof"][:]
                 nb_return = f['nb_return'][:]
-                parsed = np.concatenate([norm_x, norm_y, norm_elevation, norm_intensity, f['nb_return'][:]], axis=1)
+                parsed = np.concatenate([norm_x, norm_y, norm_elevation, norm_intensity, nb_return, lspv], axis=1)
 
                 f = h5py.File(path_spg + file, 'r')
                 numc = len(f['components'].keys())
