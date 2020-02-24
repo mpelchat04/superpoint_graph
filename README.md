@@ -28,15 +28,13 @@ by Loic Landrieu and Mohamed Boussaha (CVPR2019),
 * `./supervized_partition/*` - Supervized partition code (partitioning with learned features)
 * `./learning/*` - Learning code (superpoint embedding and contextual segmentation).
 
-To switch to the stable branch with only SPG, switch to [release](https://github.com/loicland/superpoint_graph/tree/release).
-
 ## Disclaimer
 Our partition method is inherently stochastic. Hence, even if we provide the trained weights, it is possible that the results that you obtain differ slightly from the ones presented in the paper.
 
 ## Requirements 
 *0.* Download current version of the repository. We recommend using the `--recurse-submodules` option to make sure the [cut pursuit](https://github.com/loicland/cut-pursuit) module used in `/partition` is downloaded in the process. Wether you did not used the following command, please, refer to point 4: <br>
 ```
-git clone --recurse-submodules https://github.com/loicland/superpoint_graph
+git clone --recurse-submodules https://github.com/mpelchat04/superpoint_graph
 ```
 
 *1.* Install [PyTorch](https://pytorch.org) and [torchnet](https://github.com/pytorch/tnt).

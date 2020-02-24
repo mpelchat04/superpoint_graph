@@ -209,7 +209,8 @@ def read_structure(file_name, read_geof):
     """
     data_file = h5py.File(file_name, 'r')
     xyz = np.array(data_file['xyz'], dtype='float32')
-    rgb = np.array(data_file['rgb'], dtype='float32')
+    if 'rgb' in data_file:
+        rgb = np.array(data_file['rgb'], dtype='float32')
     elevation = np.array(data_file['elevation'], dtype='float32')
     xyn = np.array(data_file['xyn'], dtype='float32')
     edg_source = np.array(data_file['source'], dtype='int').squeeze()
@@ -236,7 +237,33 @@ def get_airborne_lidar_info():
     }
 
 
-def subgraph_sampling(n_ver, edg_source, edg_target, max_ver):
+def create_airborne_lidar_datasets(args):
+    """ Gets training and test datasets. """
+
+    root = args.AIRBORNE_LIDAR_PATH
+
+    if args.dataset == 'airborne_lidar':
+        folders = ["trn", "tst"]
+    else:
+        raise ValueError(f"{args.dataset} is an unknown data set")
+
+    dataset_dict = {'trn': [], 'tst': []}
+    for folder in folders:
+        path_spg = f"{root}/superpoint_graphs/{folder}/"
+        if not os.path.isdir(f"{path_spg}/"):
+            raise ValueError(f"{path_spg} does not exist.")
+
+        for fname in sorted(os.listdir(path_spg)):
+            if fname.endswith(".h5"):
+                dataset_dict[folder].append(path_spg + fname)
+
+    trn_dataset = tnt.dataset.ListDataset(dataset_dict['trn'], functools.partial(graph_loader, train=True, args=args, db_path=root))
+    tst_dataset = tnt.dataset.ListDataset(dataset_dict['tst'], functools.partial(graph_loader, train=False, args=args, db_path=root))
+
+    return trn_dataset, tst_dataset
+
+
+def subgraph_sampling(n_ver):
     """ Select a subgraph of the input graph of max_ver verices"""
     return libply_c.random_subgraph(n_ver)
 

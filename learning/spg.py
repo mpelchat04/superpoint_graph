@@ -211,6 +211,7 @@ def eccpc_collate(batch):
     graphs = [graph for graph in graphs if graph is not None]
     GIs = [ecc.GraphConvInfo(graphs, cloud_edge_feats)]
 
+    clouds_meta = [t for t in clouds_meta if t is not None]
     if len(clouds_meta[0]) > 0:
         clouds = torch.cat([torch.from_numpy(f) for f in clouds if f is not None], 0)
         clouds_global = torch.cat([torch.from_numpy(f) for f in clouds_global if f is not None], 0)

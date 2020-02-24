@@ -46,8 +46,8 @@ def parse_args():
     parser.add_argument('--lr_decay', default=0.7, type=float, help='Multiplicative factor used on learning rate at `lr_steps`')
     parser.add_argument('--lr_steps', default='[275,320]', help='List of epochs where the learning rate is decreased by `lr_decay`')
     parser.add_argument('--momentum', default=0.9, type=float, help='Momentum')
-    parser.add_argument('--epochs', default=10, type=int, help='Number of epochs to train. If <=0, only testing will be done.')
-    parser.add_argument('--batch_size', default=2, type=int, help='Batch size')
+    parser.add_argument('--epochs', default=350, type=int, help='Number of epochs to train. If <=0, only testing will be done.')
+    parser.add_argument('--batch_size', default=5, type=int, help='Batch size')
     parser.add_argument('--optim', default='adam', help='Optimizer: sgd|adam')
     parser.add_argument('--grad_clip', default=1, type=float, help='Element-wise clipping of gradient. If 0, does not clip')
     parser.add_argument('--loss_weights', default='none', help='[none, proportional, sqrt] how to weight the loss function')
@@ -56,9 +56,9 @@ def parse_args():
     parser.add_argument('--cuda', default=1, type=int, help='Bool, use cuda')
     parser.add_argument('--nworkers', default=0, type=int, help='Num subprocesses to use for data loading. '
                                                                 '0 means that the data will be loaded in the main process')
-    parser.add_argument('--test_nth_epoch', default=1, type=int, help='Test each n-th epoch during training')
+    parser.add_argument('--test_nth_epoch', default=10, type=int, help='Test each n-th epoch during training')
     parser.add_argument('--save_nth_epoch', default=1, type=int, help='Save model each n-th epoch during training')
-    parser.add_argument('--test_multisamp_n', default=10, type=int, help='Average logits obtained over runs with different seeds')
+    parser.add_argument('--test_multisamp_n', default=1, type=int, help='Average logits obtained over runs with different seeds')
 
     # Dataset
     parser.add_argument('--dataset', default='airborne_lidar', help='Dataset name: airborne_lidar')
@@ -104,7 +104,7 @@ def parse_args():
     parser.add_argument('--spg_attribs01', default=1, type=int, help='Bool, normalize edge features to 0 mean 1 deviation')
     parser.add_argument('--spg_augm_nneigh', default=50, type=int, help='Number of neighborhoods to sample in SPG')
     parser.add_argument('--spg_augm_order', default=3, type=int, help='Order of neighborhoods to sample in SPG')
-    parser.add_argument('--spg_augm_hardcutoff', default=512, type=int, help='Maximum number of superpoints larger than args.ptn_minpts '
+    parser.add_argument('--spg_augm_hardcutoff', default=1024, type=int, help='Maximum number of superpoints larger than args.ptn_minpts '
                                                                              'to sample in SPG')
     parser.add_argument('--spg_superedge_cutoff', default=-1, type=float, help='Artificially constrained maximum length of superedge, '
                                                                                '-1=do not constrain')
@@ -264,6 +264,10 @@ def main():
 
         metrics_eval = {'acc': meter_value(acc_meter), 'loss': loss_meter.value()[0], 'oacc': confusion_matrix.get_overall_accuracy(),
                         'avg_iou': confusion_matrix.get_average_intersection_union(), 'avg_acc': confusion_matrix.get_mean_class_accuracy()}
+
+        del outputs, embeddings
+        torch.cuda.empty_cache()
+
         return metrics_eval
 
     def eval_final():
@@ -309,7 +313,7 @@ def main():
         per_class_iou = {}
         perclsiou = confusion_matrix.get_intersection_union_per_class()
         for c, name in dbinfo['inv_class_map'].items():
-            per_class_iou[name] = perclsiou[c]
+            per_class_iou[name] = perclsiou[c-1]
 
         metrics_final = {'acc': meter_value(acc_meter), 'oacc': confusion_matrix.get_overall_accuracy(),
                          'avg_iou': confusion_matrix.get_average_intersection_union(), 'per_class_iou': per_class_iou, 'predictions': predictions,
@@ -379,8 +383,9 @@ def main():
     # Final evaluation
     if args.test_multisamp_n > 0 and 'test' in args.db_test_name:
         metrics_test = eval_final()
-        print(f"-> Multisample {args.test_multisamp_n}: Test accuracy: {metrics_test['acc']:.2f}, \tTest oAcc: {metrics_test['oacc']:.2f}, "
-              f"\tTest avgIoU: {metrics_test['avg_iou']:.2f}, \tTest mAcc: {metrics_test['avg_acc']:.2f}'")
+        print(f"-> Multisample {args.test_multisamp_n}: Test accuracy: {metrics_test['acc']:.2f}, \tTest oAcc: {(100 * metrics_test['oacc']):.2f}, "
+              f"\tTest avgIoU: {(100 * metrics_test['avg_iou']):.2f}, \tTest mAcc: {(100 * metrics_test['avg_acc']):.2f} \nPer Class IoU (Test):"
+              f"{metrics_test['per_class_iou']}")
         with h5py.File(os.path.join(args.odir, 'predictions_' + args.db_test_name + '.h5'), 'w') as hf:
             for fname, o_cpu in metrics_test['predictions'].items():
                 hf.create_dataset(name=fname, data=o_cpu)  # (0-based classes)
@@ -403,12 +408,6 @@ def resume(args, dbinfo):
     optimizer = create_optimizer(args, model)
 
     model.load_state_dict(checkpoint['state_dict'])
-    # to ensure compatbility of previous trained models with new InstanceNormD behavior
-    # comment line below and uncomment line above if not using our trained  models
-    # model.load_state_dict({k: checkpoint['state_dict'][k] for k in checkpoint['state_dict'] if k not in ['ecc.0._cell.inh.running_mean',
-    #                                                                                                      'ecc.0._cell.inh.running_var',
-    #                                                                                                      'ecc.0._cell.ini.running_mean',
-    #                                                                                                      'ecc.0._cell.ini.running_var']})
 
     if 'optimizer' in checkpoint:
         optimizer.load_state_dict(checkpoint['optimizer'])

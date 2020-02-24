@@ -96,10 +96,21 @@ for folder in folders:
             print("    creating the feature file...")
             # --- read the data files and compute the labels---
             xyz, nb_return, intensity, labels = read_airborne_lidar_format(data_file)
+
+            # We have to cast 16float intensity to uint8 intensity here, to be able to prune later on.
+            intensity = (((intensity - np.min(intensity)) / (np.max(intensity) - np.min(intensity))) * 255).astype('uint8')
+
             # if no rgb available simply set here rgb = [] and make sure to not use it later on
             rgb = []
             if args.voxel_width > 0:
-                warnings.warn(f"Pruning is not implemented with the dataset {args.dataset}. The whole dataset will be used.")
+                # Concatenating nb_return and intensity with an empty array, to simulate a RGB input into the pruning algo...
+                # FIXME: Adapt the pruning algo, instead of simulating an RGB input from intensity and nb_return.
+                ret_int = np.concatenate((nb_return.astype('uint8'), intensity, np.zeros(nb_return.shape, dtype='uint8')), axis=1)
+                xyz, ret_int, labels, dump = libply_c.prune(xyz.astype('f4'), args.voxel_width, ret_int,
+                                                            labels.astype('uint8'), np.array(1, dtype='u1'), n_labels, 0)
+                nb_return = np.reshape(ret_int[:, 0], (ret_int.shape[0], 1))
+                intensity = np.reshape(ret_int[:, 1], (ret_int.shape[0], 1))
+                del ret_int
 
             start = timer()
             # ---compute 10 nn graph-------
@@ -127,7 +138,10 @@ for folder in folders:
 
             # choose here which features to use for the partition
             # In this examples, will use linearity, planarity, scattering, verticality, normalized intensity and number of returns.
-            features = np.concatenate((geof, (intensity / max(intensity)), nb_return), axis=1).astype('float32')
+            # features = np.concatenate((geof, (intensity / max(intensity)), nb_return), axis=1).astype('float32')
+
+            # In this examples, will use linearity, planarity, scattering, verticality, normalized intensity, number of returns and labels.
+            features = np.concatenate((geof, intensity, nb_return, labels), axis=1).astype('float32')
             # geof[:, 3] = 2. * geof[:, 3]
 
             graph_nn["edge_weight"] = np.array(1. / (args.lambda_edge_weight + graph_nn["distances"] / np.mean(graph_nn["distances"])),
